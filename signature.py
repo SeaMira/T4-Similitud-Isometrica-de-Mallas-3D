@@ -27,7 +27,8 @@ class SignatureExtractor(object):
                                     Must be in ['beltrami', 'cotangens', 'mesh', 'fem']. Defaults to 'cotangens'.
         """
         self.W, self.M = laplace.get_laplace_operator_approximation(mesh, approx)
-        self.n_basis = min(len(mesh.vertices) - 1, n)
+        n_points = len(mesh.vertices)
+        self.n_basis = min(n_points - 1, n)
 
         sigma = -0.01
         try:
@@ -58,7 +59,7 @@ class SignatureExtractor(object):
                                                            self.M, 
                                                            sigma=sigma,
                                                            OPinv=op_inv)
-
+        
         self._initialized = True
 
     def heat_signatures(self, dim : int, return_times=False, times=None):
@@ -82,8 +83,8 @@ class SignatureExtractor(object):
         assert self._initialized, "Signature extractor was not initialized"
 
         if times is None:
-            tmin  = 4 * math.log(10) / self.evals[-1]
-            tmax  = 4 * math.log(10) / self.evals[1]
+            tmin = max(4 * math.log(10) / self.evals[-1], 1e-6)
+            tmax = min(4 * math.log(10) / self.evals[1], 1e3)
             times = np.geomspace(tmin, tmax, dim)
         else:
             times = np.array(times).flatten()
@@ -91,7 +92,7 @@ class SignatureExtractor(object):
 
 
         phi2       = np.square(self.evecs[:, 1:])
-        exp        = np.exp(-self.evals[1:, None]*times[None])
+        exp        = np.exp(-np.clip(self.evals[1:, None]*times[None], -1e2, 1e2))
         s          = np.sum(phi2[..., None]*exp[None], axis=1)
         heat_trace = np.sum(exp, axis=0)
         s          = s / heat_trace[None] 
